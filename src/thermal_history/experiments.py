@@ -6,10 +6,16 @@ from collections.abc import Callable, Sequence
 import numpy as np
 import pandas as pd
 
-from thermal_history.model import crystallinity_from_durations
+from thermal_history.model import (
+    crystallinity_from_durations,
+    fraction_from_observation,
+    observation_from_fraction,
+    sensor_matrix,
+)
 from thermal_history.paper_data import CELSIUS_TO_KELVIN, get_sensor
 from thermal_history.solvers import (
     add_multiplicative_noise,
+    solve_lls,
     solve_nnls,
     solve_tikhonov,
     solve_tikhonov_total_time,
@@ -182,6 +188,98 @@ def regularization_sweep(
                     "sensor21_fend_std": float(np.std(fends, ddof=1)),
                 }
             )
+
+    return pd.DataFrame(rows)
+
+
+def numerical_diagnostics(alpha: float = 1e-11) -> dict[str, object]:
+    sensors = [get_sensor(number) for number in range(21, 26)]
+    temperatures_k = _temperatures_k(MAIN_TEMPERATURES_C)
+    fractions = crystallinity_from_durations(sensors, temperatures_k, MAIN_DURATIONS_S)
+    matrix = sensor_matrix(sensors, temperatures_k)
+    total_time = float(np.sum(MAIN_DURATIONS_S))
+
+    lls = solve_lls(sensors, temperatures_k, fractions)
+    regularized = solve_tikhonov(sensors, temperatures_k, fractions, alpha=alpha)
+    total_time_alpha0 = solve_tikhonov_total_time(
+        sensors,
+        temperatures_k,
+        fractions,
+        alpha=0.0,
+        total_time_s=total_time,
+    )
+    total_time_regularized = solve_tikhonov_total_time(
+        sensors,
+        temperatures_k,
+        fractions,
+        alpha=alpha,
+        total_time_s=total_time,
+    )
+
+    return {
+        "condition_number": float(np.linalg.cond(matrix)),
+        "alpha": float(alpha),
+        "noise_placement": "fractional_crystallinity",
+        "fig4_allows_negative_durations": True,
+        "noiseless_lls_error_norm_s": float(np.linalg.norm(lls - MAIN_DURATIONS_S)),
+        "noiseless_regularized_error_norm_s": float(np.linalg.norm(regularized - MAIN_DURATIONS_S)),
+        "noiseless_total_time_alpha0_error_norm_s": float(
+            np.linalg.norm(total_time_alpha0 - MAIN_DURATIONS_S)
+        ),
+        "noiseless_total_time_regularized_error_norm_s": float(
+            np.linalg.norm(total_time_regularized - MAIN_DURATIONS_S)
+        ),
+        "noiseless_total_time_regularized_solution_s": " ".join(
+            f"{value:.6g}" for value in total_time_regularized
+        ),
+    }
+
+
+def noise_model_comparison(
+    samples: int = 400,
+    seed: int = 2018,
+    noise_fraction: float = 0.05,
+    alpha: float = 1e-11,
+) -> pd.DataFrame:
+    sensors = [get_sensor(number) for number in range(21, 26)]
+    temperatures_k = _temperatures_k(MAIN_TEMPERATURES_C)
+    fractions = crystallinity_from_durations(sensors, temperatures_k, MAIN_DURATIONS_S)
+    observation = observation_from_fraction(fractions)
+    total_time = float(np.sum(MAIN_DURATIONS_S))
+    rows = []
+
+    for noise_placement in ["fractional_crystallinity", "linearized_observation"]:
+        rng = np.random.default_rng(seed)
+        estimates = []
+        for _ in range(samples):
+            if noise_placement == "fractional_crystallinity":
+                noisy_fractions = add_multiplicative_noise(fractions, noise_fraction, rng)
+            else:
+                noisy_observation = observation * (
+                    1.0 + rng.normal(0.0, noise_fraction, size=observation.shape)
+                )
+                noisy_fractions = fraction_from_observation(noisy_observation)
+            estimates.append(
+                solve_tikhonov_total_time(
+                    sensors,
+                    temperatures_k,
+                    noisy_fractions,
+                    alpha=alpha,
+                    total_time_s=total_time,
+                )
+            )
+        estimates = np.vstack(estimates)
+        rows.append(
+            {
+                "noise_placement": noise_placement,
+                "fig4_t3_mean_s": float(np.mean(estimates[:, 2])),
+                "fig4_t3_std_s": float(np.std(estimates[:, 2], ddof=1)),
+                "fig4_t4_mean_s": float(np.mean(estimates[:, 3])),
+                "fig4_t4_std_s": float(np.std(estimates[:, 3], ddof=1)),
+                "fig4_t5_mean_s": float(np.mean(estimates[:, 4])),
+                "fig4_t5_std_s": float(np.std(estimates[:, 4], ddof=1)),
+            }
+        )
 
     return pd.DataFrame(rows)
 

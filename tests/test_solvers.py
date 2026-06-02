@@ -8,6 +8,7 @@ from thermal_history.solvers import (
     solve_lls,
     solve_nnls,
     solve_tikhonov_total_time,
+    solve_tikhonov_total_time_nonnegative,
 )
 
 
@@ -37,11 +38,48 @@ def test_nnls_returns_non_negative_duration_estimates_for_noisy_readout():
     assert np.all(estimate >= 0.0)
 
 
-def test_total_time_tikhonov_preserves_known_exposure_duration():
+def test_total_time_constrained_lls_recovers_noiseless_history_without_regularization():
+    sensors, temperatures_k, durations_s, fractions = five_interval_case()
+
+    estimate = solve_tikhonov_total_time(
+        sensors,
+        temperatures_k,
+        fractions,
+        alpha=0.0,
+        total_time_s=float(np.sum(durations_s)),
+    )
+
+    np.testing.assert_allclose(estimate, durations_s, rtol=1e-8, atol=1e-3)
+    assert np.sum(estimate) == pytest.approx(np.sum(durations_s), abs=1e-8)
+
+
+def test_total_time_tikhonov_uses_exact_equality_without_nonnegative_bounds():
+    sensors, temperatures_k, durations_s, fractions = five_interval_case()
+    rng = np.random.default_rng(1)
+    estimates = []
+
+    for _ in range(20):
+        noisy = add_multiplicative_noise(fractions, noise_fraction=0.05, rng=rng)
+        estimates.append(
+            solve_tikhonov_total_time(
+                sensors,
+                temperatures_k,
+                noisy,
+                alpha=1e-11,
+                total_time_s=float(np.sum(durations_s)),
+            )
+        )
+    estimates = np.vstack(estimates)
+
+    np.testing.assert_allclose(estimates.sum(axis=1), np.sum(durations_s), atol=1e-8)
+    assert np.any(estimates < 0.0)
+
+
+def test_total_time_nonnegative_solver_is_separate_from_fig4_solver():
     sensors, temperatures_k, durations_s, fractions = five_interval_case()
     noisy = add_multiplicative_noise(fractions, noise_fraction=0.05, rng=np.random.default_rng(8))
 
-    estimate = solve_tikhonov_total_time(
+    estimate = solve_tikhonov_total_time_nonnegative(
         sensors,
         temperatures_k,
         noisy,
@@ -49,5 +87,5 @@ def test_total_time_tikhonov_preserves_known_exposure_duration():
         total_time_s=float(np.sum(durations_s)),
     )
 
-    assert np.sum(estimate) == pytest.approx(np.sum(durations_s), abs=1e-6)
+    assert np.sum(estimate) == pytest.approx(np.sum(durations_s), abs=1e-5)
     assert np.all(estimate >= -1e-8)

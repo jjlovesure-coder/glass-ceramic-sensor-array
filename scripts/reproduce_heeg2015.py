@@ -4,6 +4,8 @@ import argparse
 import sys
 from pathlib import Path
 
+import pandas as pd
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -14,6 +16,8 @@ from thermal_history.experiments import (  # noqa: E402
     fig3_fig4_histogram_outputs,
     main_reconstruction_estimates,
     main_reconstruction_summary,
+    noise_model_comparison,
+    numerical_diagnostics,
     regularization_sweep,
     spike_reconstruction_summary,
 )
@@ -33,7 +37,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def write_output_readme(output_dir: Path, samples: int) -> None:
+def write_output_readme(output_dir: Path, samples: int, diagnostics: dict[str, object]) -> None:
     (output_dir / "README.md").write_text(
         "\n".join(
             [
@@ -46,6 +50,8 @@ def write_output_readme(output_dir: Path, samples: int) -> None:
                 "- `main_reconstruction_summary.csv`: five-interval reconstruction statistics.",
                 "- `fig3_regularized_lls_summary.csv`: regularized LLS statistics for Fig. 3.",
                 "- `fig4_total_time_constrained_summary.csv`: total-time constrained statistics for Fig. 4.",
+                "- `numerical_diagnostics.csv`: condition number, alpha, noise placement, and noiseless solver checks.",
+                "- `noise_model_comparison.csv`: Fig. 4 summary comparison for fractional-crystallinity and linearized-observation noise.",
                 "- `regularization_sweep.csv`: alpha sweep and sensor 21 end-crystallinity checks.",
                 "- `spike_reconstruction_summary.csv`: short spike reconstruction statistics.",
                 "- `fig3_regularized_lls_histograms.png`: reproduction of Fig. 3 histogram style.",
@@ -56,6 +62,10 @@ def write_output_readme(output_dir: Path, samples: int) -> None:
                 "- `fig_spike_reconstruction.png`: estimated high-temperature duration versus spike temperature.",
                 "",
                 "The model uses the paper's pre-nucleated two-dimensional simplification.",
+                f"Fig. 3/Fig. 4 alpha: `{diagnostics['alpha']}`.",
+                f"Sensor matrix condition number: `{diagnostics['condition_number']:.6g}`.",
+                f"Noise placement: `{diagnostics['noise_placement']}`.",
+                "Fig. 4 uses an exact total-time equality constraint and permits negative interval estimates; NNLS/non-negativity is kept separate for Fig. 5-style solves.",
             ]
         ),
         encoding="utf-8",
@@ -69,6 +79,8 @@ def main() -> None:
     main_estimates = main_reconstruction_estimates(samples=args.samples, seed=args.seed, method="nnls")
     main_summary = main_reconstruction_summary(samples=args.samples, seed=args.seed, method="nnls")
     fig_histograms = fig3_fig4_histogram_outputs(samples=args.samples, seed=args.seed)
+    diagnostics = numerical_diagnostics()
+    noise_comparison = noise_model_comparison(samples=max(50, args.samples // 5), seed=args.seed + 3)
     sweep = regularization_sweep(samples=max(50, args.samples // 5), seed=args.seed + 1)
     spike = spike_reconstruction_summary(samples=args.samples, seed=args.seed + 2)
 
@@ -83,6 +95,8 @@ def main() -> None:
     )
     sweep.to_csv(args.output / "regularization_sweep.csv", index=False)
     spike.to_csv(args.output / "spike_reconstruction_summary.csv", index=False)
+    pd.DataFrame([diagnostics]).to_csv(args.output / "numerical_diagnostics.csv", index=False)
+    noise_comparison.to_csv(args.output / "noise_model_comparison.csv", index=False)
 
     save_main_histograms(
         fig_histograms["fig3_regularized_lls"].estimates,
@@ -98,7 +112,7 @@ def main() -> None:
     save_regularization_sweep(sweep, args.output / "fig_regularization_sweep.png")
     save_fend_reconstruction(sweep, args.output / "fig_fend_reconstruction.png")
     save_spike_reconstruction(spike, args.output / "fig_spike_reconstruction.png")
-    write_output_readme(args.output, args.samples)
+    write_output_readme(args.output, args.samples, diagnostics)
 
     print(f"Wrote Heeg 2015 reproduction outputs to {args.output}")
 

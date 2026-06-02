@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import numpy as np
-from scipy.optimize import lsq_linear, nnls
+from scipy.optimize import minimize, nnls
 
 from thermal_history.model import observation_from_fraction, sensor_matrix
 from thermal_history.paper_data import SensorParameters
@@ -49,27 +49,48 @@ def solve_tikhonov_total_time(
 ) -> np.ndarray:
     matrix, observation = _matrix_and_observation(sensors, temperatures_k, fractions)
     n_intervals = matrix.shape[1]
-    augmented_matrix = np.vstack(
+    normal = matrix.T @ matrix + alpha * np.eye(n_intervals)
+    rhs = matrix.T @ observation
+    constraint = np.ones((1, n_intervals))
+    kkt = np.block(
         [
-            matrix,
-            np.sqrt(alpha) * np.eye(n_intervals),
-            np.ones((1, n_intervals)),
+            [normal, constraint.T],
+            [constraint, np.zeros((1, 1))],
         ]
     )
-    augmented_observation = np.concatenate(
-        [
-            observation,
-            np.zeros(n_intervals),
-            np.array([total_time_s], dtype=float),
-        ]
+    kkt_rhs = np.concatenate([rhs, np.array([total_time_s], dtype=float)])
+    return np.linalg.solve(kkt, kkt_rhs)[:n_intervals]
+
+
+def solve_tikhonov_total_time_nonnegative(
+    sensors: Sequence[SensorParameters],
+    temperatures_k: Sequence[float],
+    fractions: Sequence[float],
+    alpha: float,
+    total_time_s: float,
+) -> np.ndarray:
+    matrix, observation = _matrix_and_observation(sensors, temperatures_k, fractions)
+    n_intervals = matrix.shape[1]
+    initial = np.full(n_intervals, total_time_s / n_intervals, dtype=float)
+
+    def objective(durations: np.ndarray) -> float:
+        residual = matrix @ durations - observation
+        return 0.5 * float(residual @ residual + alpha * durations @ durations)
+
+    def gradient(durations: np.ndarray) -> np.ndarray:
+        return matrix.T @ (matrix @ durations - observation) + alpha * durations
+
+    result = minimize(
+        objective,
+        initial,
+        jac=gradient,
+        bounds=[(0.0, None)] * n_intervals,
+        constraints={"type": "eq", "fun": lambda durations: np.sum(durations) - total_time_s},
+        method="SLSQP",
+        options={"ftol": 1e-12, "maxiter": 1000},
     )
-    result = lsq_linear(
-        augmented_matrix,
-        augmented_observation,
-        bounds=(0.0, np.inf),
-        tol=1e-12,
-        lsmr_tol="auto",
-    )
+    if not result.success:
+        raise RuntimeError(f"Non-negative total-time solve failed: {result.message}")
     return result.x
 
 

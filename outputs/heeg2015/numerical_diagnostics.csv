@@ -1,0 +1,2 @@
+condition_number,alpha,noise_placement,fig4_allows_negative_durations,noiseless_lls_error_norm_s,noiseless_regularized_error_norm_s,noiseless_total_time_alpha0_error_norm_s,noiseless_total_time_regularized_error_norm_s,noiseless_total_time_regularized_solution_s
+38330513.932658955,1e-11,fractional_crystallinity,True,1.3132240706641271e-07,750.7528944708545,9.797740098963036e-05,175.0733968716475,465.937 456.321 395.622 181.003 101.117
