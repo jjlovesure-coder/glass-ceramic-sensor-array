@@ -11,6 +11,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from thermal_history.experiments import (  # noqa: E402
+    fig3_fig4_histogram_outputs,
     main_reconstruction_estimates,
     main_reconstruction_summary,
     regularization_sweep,
@@ -43,8 +44,12 @@ def write_output_readme(output_dir: Path, samples: int) -> None:
                 "Files:",
                 "",
                 "- `main_reconstruction_summary.csv`: five-interval reconstruction statistics.",
+                "- `fig3_regularized_lls_summary.csv`: regularized LLS statistics for Fig. 3.",
+                "- `fig4_total_time_constrained_summary.csv`: total-time constrained statistics for Fig. 4.",
                 "- `regularization_sweep.csv`: alpha sweep and sensor 21 end-crystallinity checks.",
                 "- `spike_reconstruction_summary.csv`: short spike reconstruction statistics.",
+                "- `fig3_regularized_lls_histograms.png`: reproduction of Fig. 3 histogram style.",
+                "- `fig4_total_time_constrained_histograms.png`: reproduction of Fig. 4 histogram style.",
                 "- `fig_main_histograms.png`: histograms comparable to the paper's main examples.",
                 "- `fig_regularization_sweep.png`: duration sensitivity to regularization.",
                 "- `fig_fend_reconstruction.png`: reconstructed sensor 21 crystallinity.",
@@ -63,13 +68,32 @@ def main() -> None:
 
     main_estimates = main_reconstruction_estimates(samples=args.samples, seed=args.seed, method="nnls")
     main_summary = main_reconstruction_summary(samples=args.samples, seed=args.seed, method="nnls")
+    fig_histograms = fig3_fig4_histogram_outputs(samples=args.samples, seed=args.seed)
     sweep = regularization_sweep(samples=max(50, args.samples // 5), seed=args.seed + 1)
     spike = spike_reconstruction_summary(samples=args.samples, seed=args.seed + 2)
 
     main_summary.to_csv(args.output / "main_reconstruction_summary.csv", index=False)
+    fig_histograms["fig3_regularized_lls"].summary.to_csv(
+        args.output / "fig3_regularized_lls_summary.csv",
+        index=False,
+    )
+    fig_histograms["fig4_total_time_constrained"].summary.to_csv(
+        args.output / "fig4_total_time_constrained_summary.csv",
+        index=False,
+    )
     sweep.to_csv(args.output / "regularization_sweep.csv", index=False)
     spike.to_csv(args.output / "spike_reconstruction_summary.csv", index=False)
 
+    save_main_histograms(
+        fig_histograms["fig3_regularized_lls"].estimates,
+        args.output / "fig3_regularized_lls_histograms.png",
+        title=fig_histograms["fig3_regularized_lls"].title,
+    )
+    save_main_histograms(
+        fig_histograms["fig4_total_time_constrained"].estimates,
+        args.output / "fig4_total_time_constrained_histograms.png",
+        title=fig_histograms["fig4_total_time_constrained"].title,
+    )
     save_main_histograms(main_estimates, args.output / "fig_main_histograms.png")
     save_regularization_sweep(sweep, args.output / "fig_regularization_sweep.png")
     save_fend_reconstruction(sweep, args.output / "fig_fend_reconstruction.png")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from collections.abc import Callable, Sequence
 
 import numpy as np
@@ -10,6 +11,7 @@ from thermal_history.paper_data import CELSIUS_TO_KELVIN, get_sensor
 from thermal_history.solvers import (
     add_multiplicative_noise,
     solve_nnls,
+    solve_tikhonov,
     solve_tikhonov_total_time,
 )
 
@@ -18,6 +20,14 @@ MAIN_TEMPERATURES_C = np.array([700, 800, 900, 1000, 1100], dtype=float)
 MAIN_DURATIONS_S = np.array([600, 400, 300, 200, 100], dtype=float)
 SPIKE_RECON_TEMPERATURES_C = np.array([900, 1000, 1100], dtype=float)
 SPIKE_BASE_DURATIONS_S = np.array([1000, 590], dtype=float)
+
+
+@dataclass(frozen=True)
+class HistogramReconstruction:
+    name: str
+    title: str
+    estimates: np.ndarray
+    summary: pd.DataFrame
 
 
 def _temperatures_k(temperatures_c: Sequence[float]) -> np.ndarray:
@@ -66,6 +76,13 @@ def main_reconstruction_estimates(
 
     if method == "nnls":
         solve = lambda noisy: solve_nnls(sensors, temperatures_k, noisy)
+    elif method == "regularized_tikhonov":
+        solve = lambda noisy: solve_tikhonov(
+            sensors,
+            temperatures_k,
+            noisy,
+            alpha=1e-11,
+        )
     elif method == "constrained_tikhonov":
         solve = lambda noisy: solve_tikhonov_total_time(
             sensors,
@@ -88,6 +105,39 @@ def main_reconstruction_summary(
 ) -> pd.DataFrame:
     estimates = main_reconstruction_estimates(samples, seed, method, noise_fraction)
     return _summarize_by_interval(MAIN_TEMPERATURES_C, estimates)
+
+
+def fig3_fig4_histogram_outputs(
+    samples: int = 2000,
+    seed: int = 2015,
+    noise_fraction: float = 0.05,
+) -> dict[str, HistogramReconstruction]:
+    fig3_estimates = main_reconstruction_estimates(
+        samples=samples,
+        seed=seed,
+        method="regularized_tikhonov",
+        noise_fraction=noise_fraction,
+    )
+    fig4_estimates = main_reconstruction_estimates(
+        samples=samples,
+        seed=seed,
+        method="constrained_tikhonov",
+        noise_fraction=noise_fraction,
+    )
+    return {
+        "fig3_regularized_lls": HistogramReconstruction(
+            name="fig3_regularized_lls",
+            title="Fig. 3 reproduction: regularized LLS",
+            estimates=fig3_estimates,
+            summary=_summarize_by_interval(MAIN_TEMPERATURES_C, fig3_estimates),
+        ),
+        "fig4_total_time_constrained": HistogramReconstruction(
+            name="fig4_total_time_constrained",
+            title="Fig. 4 reproduction: total-time constrained LLS",
+            estimates=fig4_estimates,
+            summary=_summarize_by_interval(MAIN_TEMPERATURES_C, fig4_estimates),
+        ),
+    }
 
 
 def regularization_sweep(

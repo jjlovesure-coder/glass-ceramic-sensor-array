@@ -1,6 +1,7 @@
 import numpy as np
 
 from thermal_history.experiments import (
+    fig3_fig4_histogram_outputs,
     main_reconstruction_summary,
     regularization_sweep,
     spike_reconstruction_summary,
@@ -13,6 +14,20 @@ def test_main_reconstruction_summary_contains_expected_intervals():
     assert list(summary["temperature_c"]) == [700, 800, 900, 1000, 1100]
     assert summary.loc[summary["temperature_c"] == 1100, "mean_s"].iloc[0] > 50.0
     assert summary.loc[summary["temperature_c"] == 1100, "mean_s"].iloc[0] < 150.0
+
+
+def test_fig3_and_fig4_histogram_outputs_are_distinct_reconstruction_methods():
+    outputs = fig3_fig4_histogram_outputs(samples=50, seed=21)
+
+    assert set(outputs) == {"fig3_regularized_lls", "fig4_total_time_constrained"}
+    assert outputs["fig3_regularized_lls"].estimates.shape == (50, 5)
+    assert outputs["fig4_total_time_constrained"].estimates.shape == (50, 5)
+    assert np.any(outputs["fig3_regularized_lls"].estimates < 0.0)
+    np.testing.assert_allclose(
+        outputs["fig4_total_time_constrained"].estimates.sum(axis=1),
+        1600.0,
+        atol=1e-5,
+    )
 
 
 def test_regularization_sweep_reports_sensor_21_end_crystallinity():

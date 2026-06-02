@@ -9,7 +9,11 @@ import pandas as pd
 from thermal_history.experiments import MAIN_DURATIONS_S, MAIN_TEMPERATURES_C
 
 
-def save_main_histograms(estimates: np.ndarray, output_path: Path) -> None:
+def save_main_histograms(
+    estimates: np.ndarray,
+    output_path: Path,
+    title: str = "Heeg 2015 main reconstruction histograms",
+) -> None:
     fig, axes = plt.subplots(1, 3, figsize=(12, 3.5), constrained_layout=True)
     selected = [4, 3, 2]
     for axis, index in zip(axes, selected, strict=True):
@@ -18,7 +22,7 @@ def save_main_histograms(estimates: np.ndarray, output_path: Path) -> None:
         axis.set_title(f"{MAIN_TEMPERATURES_C[index]:.0f} C")
         axis.set_xlabel("Estimated duration (s)")
         axis.set_ylabel("Count")
-    fig.suptitle("Heeg 2015 main reconstruction histograms")
+    fig.suptitle(title)
     fig.savefig(output_path, dpi=200)
     plt.close(fig)
 
