@@ -16,7 +16,9 @@ from thermal_history.experiments import (  # noqa: E402
     fig3_fig4_histogram_outputs,
     main_reconstruction_estimates,
     main_reconstruction_summary,
+    noise_amplitude_sweep,
     noise_model_comparison,
+    nnls_fend_summary,
     numerical_diagnostics,
     regularization_sweep,
     spike_reconstruction_summary,
@@ -27,6 +29,11 @@ from thermal_history.plotting import (  # noqa: E402
     save_regularization_sweep,
     save_spike_reconstruction,
 )
+from thermal_history.reproduction_report import (  # noqa: E402
+    build_validation_report,
+    combined_observations,
+    write_validation_outputs,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -34,6 +41,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--samples", type=int, default=2000, help="Monte Carlo samples per experiment.")
     parser.add_argument("--output", type=Path, default=Path("outputs/heeg2015"), help="Output directory.")
     parser.add_argument("--seed", type=int, default=2015, help="Base random seed.")
+    parser.add_argument(
+        "--target-file",
+        type=Path,
+        default=Path("data/paper_targets/heeg2015/text_targets.csv"),
+        help="Paper target CSV used for validation.",
+    )
     return parser.parse_args()
 
 
@@ -52,8 +65,13 @@ def write_output_readme(output_dir: Path, samples: int, diagnostics: dict[str, o
                 "- `fig4_total_time_constrained_summary.csv`: total-time constrained statistics for Fig. 4.",
                 "- `numerical_diagnostics.csv`: condition number, alpha, noise placement, and noiseless solver checks.",
                 "- `noise_model_comparison.csv`: Fig. 4 summary comparison for fractional-crystallinity and linearized-observation noise.",
+                "- `noise_amplitude_sweep.csv`: effective-noise sweep for paper-target discrepancy diagnosis.",
+                "- `nnls_fend_summary.csv`: Fig. 7-style SciPy NNLS objective sensor 21 end-crystallinity summary.",
                 "- `regularization_sweep.csv`: alpha sweep and sensor 21 end-crystallinity checks.",
                 "- `spike_reconstruction_summary.csv`: short spike reconstruction statistics.",
+                "- `paper_target_observations.csv`: observed metrics extracted from generated outputs and model diagnostics.",
+                "- `paper_target_validation.csv`: target-by-target tolerance validation against paper text targets.",
+                "- `paper_target_validation.md`: human-readable validation summary.",
                 "- `fig3_regularized_lls_histograms.png`: reproduction of Fig. 3 histogram style.",
                 "- `fig4_total_time_constrained_histograms.png`: reproduction of Fig. 4 histogram style.",
                 "- `fig_main_histograms.png`: histograms comparable to the paper's main examples.",
@@ -81,7 +99,9 @@ def main() -> None:
     fig_histograms = fig3_fig4_histogram_outputs(samples=args.samples, seed=args.seed)
     diagnostics = numerical_diagnostics()
     noise_comparison = noise_model_comparison(samples=max(50, args.samples // 5), seed=args.seed + 3)
+    noise_sweep = noise_amplitude_sweep(samples=max(50, args.samples // 5), seed=args.seed + 4)
     sweep = regularization_sweep(samples=max(50, args.samples // 5), seed=args.seed + 1)
+    nnls_fend = nnls_fend_summary(samples=args.samples, seed=args.seed)
     spike = spike_reconstruction_summary(samples=args.samples, seed=args.seed + 2)
 
     main_summary.to_csv(args.output / "main_reconstruction_summary.csv", index=False)
@@ -94,9 +114,11 @@ def main() -> None:
         index=False,
     )
     sweep.to_csv(args.output / "regularization_sweep.csv", index=False)
+    nnls_fend.to_csv(args.output / "nnls_fend_summary.csv", index=False)
     spike.to_csv(args.output / "spike_reconstruction_summary.csv", index=False)
     pd.DataFrame([diagnostics]).to_csv(args.output / "numerical_diagnostics.csv", index=False)
     noise_comparison.to_csv(args.output / "noise_model_comparison.csv", index=False)
+    noise_sweep.to_csv(args.output / "noise_amplitude_sweep.csv", index=False)
 
     save_main_histograms(
         fig_histograms["fig3_regularized_lls"].estimates,
@@ -113,6 +135,15 @@ def main() -> None:
     save_fend_reconstruction(sweep, args.output / "fig_fend_reconstruction.png")
     save_spike_reconstruction(spike, args.output / "fig_spike_reconstruction.png")
     write_output_readme(args.output, args.samples, diagnostics)
+
+    observations = combined_observations(args.output)
+    observations.to_csv(args.output / "paper_target_observations.csv", index=False)
+    report = build_validation_report(args.output, args.target_file)
+    write_validation_outputs(
+        report,
+        args.output / "paper_target_validation.csv",
+        args.output / "paper_target_validation.md",
+    )
 
     print(f"Wrote Heeg 2015 reproduction outputs to {args.output}")
 

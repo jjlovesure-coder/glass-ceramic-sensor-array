@@ -1,0 +1,23 @@
+figure,metric,target,unit,tolerance_relative,tolerance_absolute,source,note,observed,abs_error,relative_error,allowed_error,passed
+fig2,t1_truth_s,600.0,s,0.05,0.0,paper_text,Equivalent history interval at 700 C.,600.0,0.0,0.0,30.0,True
+fig2,t2_truth_s,400.0,s,0.05,0.0,paper_text,Equivalent history interval at 800 C.,400.0,0.0,0.0,20.0,True
+fig2,t3_truth_s,300.0,s,0.05,0.0,paper_text,Equivalent history interval at 900 C.,300.0,0.0,0.0,15.0,True
+fig2,t4_truth_s,200.0,s,0.05,0.0,paper_text,Equivalent history interval at 1000 C.,200.0,0.0,0.0,10.0,True
+fig2,t5_truth_s,100.0,s,0.05,0.0,paper_text,Equivalent history interval at 1100 C.,100.0,0.0,0.0,5.0,True
+fig3,t4_mean_s,260.0,s,0.05,0.0,paper_text,Regularized LLS with noise; paper states reconstructed time around 260 s at 1000 C.,281.80685450641226,21.806854506412265,0.08387251733235486,13.0,False
+fig3,t5_mean_s,93.0,s,0.05,0.0,paper_text,Regularized LLS with noise; paper states mean around 93 s at 1100 C.,92.40948683742694,0.5905131625730604,0.006349603898635058,4.65,True
+fig3,t5_std_s,7.0,s,0.05,0.0,paper_text,Regularized LLS with noise; paper states standard deviation about 7 percent of 100 s.,66.57176320673393,59.571763206733934,8.510251886676276,0.35000000000000003,False
+fig6,noiseless_t1_s,600.05,s,0.05,0.0,paper_text,Noiseless alpha=0 LLS recovery reported in paper.,600.000000127376,0.04999987262397099,8.332617719185233e-05,30.002499999999998,True
+fig6,noiseless_t2_s,399.94,s,0.05,0.0,paper_text,Noiseless alpha=0 LLS recovery reported in paper.,399.99999996830365,0.05999996830365717,0.00015002242412276133,19.997,True
+fig6,noiseless_t3_s,300.01,s,0.05,0.0,paper_text,Noiseless alpha=0 LLS recovery reported in paper.,300.0000000040239,0.009999995976102127,3.33322088467122e-05,15.0005,True
+fig6,noiseless_t4_s,200.0,s,0.05,0.0,paper_text,Noiseless alpha=0 LLS recovery reported in paper.,199.9999999997113,2.887077243940439e-10,1.4435386219702195e-12,10.0,True
+fig6,noiseless_t5_s,100.0,s,0.05,0.0,paper_text,Noiseless alpha=0 LLS recovery reported in paper.,100.00000000000945,9.450218385609332e-12,9.450218385609333e-14,5.0,True
+fig7,fend_sensor21_exact,0.386,fraction,0.05,0.0,paper_text,Paper states exact end crystallinity for sensor 21.,0.38600000037596927,3.759692557281369e-10,9.740136158760024e-10,0.0193,True
+fig7,nnls_fend_mean,0.385,fraction,0.05,0.0,paper_text,Paper states PQN-NNLS reconstructed end crystallinity for sensor 21; this implementation evaluates the same NNLS objective with SciPy nnls.,0.3840790424606518,0.0009209575393482328,0.0023920975048006047,0.019250000000000003,True
+fig7,nnls_fend_std,0.003,fraction,0.05,0.0,paper_text,Paper states PQN-NNLS standard deviation for sensor 21 end crystallinity; this implementation evaluates the same NNLS objective with SciPy nnls.,0.014348164924436,0.011348164924436,3.782721641478667,0.00015000000000000001,False
+fig8_spike_1100,t1_mean_s,999.7,s,0.05,0.0,paper_text,Spike reconstruction at 1100 C: first plateau duration.,1000.0743263987926,0.37432639879250473,0.0003744387304116282,49.98500000000001,True
+fig8_spike_1100,t1_std_s,12.0,s,0.05,0.0,paper_text,Spike reconstruction at 1100 C: first plateau standard deviation.,58.05531090652876,46.05531090652876,3.8379425755440635,0.6000000000000001,False
+fig8_spike_1100,t2_mean_s,590.4,s,0.05,0.0,paper_text,Spike reconstruction at 1100 C: second plateau duration.,589.9016095904184,0.49839040958158876,0.000844157197800794,29.52,True
+fig8_spike_1100,t2_std_s,15.0,s,0.05,0.0,paper_text,Spike reconstruction at 1100 C: second plateau standard deviation.,65.5866826329783,50.586682632978295,3.3724455088652197,0.75,False
+fig8_spike_1100,t3_mean_s,9.9,s,0.05,0.0,paper_text,Spike reconstruction at 1100 C: high-temperature spike duration.,10.02406401078899,0.12406401078898988,0.012531718261514129,0.49500000000000005,True
+fig8_spike_1100,t3_std_s,3.5,s,0.05,0.0,paper_text,Spike reconstruction at 1100 C: high-temperature spike standard deviation.,7.725432466019236,4.225432466019236,1.207266418862639,0.17500000000000002,False

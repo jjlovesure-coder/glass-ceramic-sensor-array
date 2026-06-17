@@ -3,7 +3,9 @@ import numpy as np
 from thermal_history.experiments import (
     fig3_fig4_histogram_outputs,
     main_reconstruction_summary,
+    noise_amplitude_sweep,
     noise_model_comparison,
+    nnls_fend_summary,
     numerical_diagnostics,
     regularization_sweep,
     spike_reconstruction_summary,
@@ -46,6 +48,15 @@ def test_regularization_sweep_reports_sensor_21_end_crystallinity():
     assert np.all(sweep["sensor21_fend_mean"] < 0.8)
 
 
+def test_nnls_fend_summary_reports_sensor_21_end_crystallinity():
+    summary = nnls_fend_summary(samples=20, seed=12)
+
+    assert set(["method", "sensor21_fend_mean", "sensor21_fend_std"]).issubset(summary.columns)
+    assert summary.loc[0, "method"] == "scipy_nnls"
+    assert 0.2 < summary.loc[0, "sensor21_fend_mean"] < 0.8
+    assert summary.loc[0, "sensor21_fend_std"] > 0.0
+
+
 def test_numerical_diagnostics_record_solver_and_noise_assumptions():
     diagnostics = numerical_diagnostics()
 
@@ -64,6 +75,14 @@ def test_noise_model_comparison_reports_fraction_and_linearized_noise():
     assert set(["fig4_t3_mean_s", "fig4_t3_std_s", "fig4_t4_mean_s", "fig4_t4_std_s"]).issubset(
         comparison.columns
     )
+
+
+def test_noise_amplitude_sweep_records_main_and_spike_target_metrics():
+    sweep = noise_amplitude_sweep(samples=20, seed=31, noise_fractions=np.array([0.005, 0.05]))
+
+    assert set(sweep["experiment"]) == {"fig3_regularized_lls", "spike_1100"}
+    assert set(sweep["noise_placement"]) == {"fractional_crystallinity", "linearized_observation"}
+    assert set(["noise_fraction", "t5_mean_s", "t5_std_s", "t3_std_s"]).issubset(sweep.columns)
 
 
 def test_spike_reconstruction_recovers_ten_second_1100c_spike():

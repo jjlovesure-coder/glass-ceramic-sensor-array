@@ -60,11 +60,21 @@ def _monte_carlo_estimates(
     seed: int,
     solve: Callable[[np.ndarray], np.ndarray],
     noise_fraction: float,
+    noise_placement: str = "fractional_crystallinity",
 ) -> np.ndarray:
     rng = np.random.default_rng(seed)
+    observation = observation_from_fraction(fractions)
     estimates = []
     for _ in range(samples):
-        noisy = add_multiplicative_noise(fractions, noise_fraction, rng)
+        if noise_placement == "fractional_crystallinity":
+            noisy = add_multiplicative_noise(fractions, noise_fraction, rng)
+        elif noise_placement == "linearized_observation":
+            noisy_observation = observation * (
+                1.0 + rng.normal(0.0, noise_fraction, size=observation.shape)
+            )
+            noisy = fraction_from_observation(noisy_observation)
+        else:
+            raise ValueError(f"Unknown noise placement: {noise_placement}")
         estimates.append(solve(noisy))
     return np.vstack(estimates)
 
@@ -192,6 +202,36 @@ def regularization_sweep(
     return pd.DataFrame(rows)
 
 
+def nnls_fend_summary(
+    samples: int = 2000,
+    seed: int = 2015,
+    noise_fraction: float = 0.05,
+) -> pd.DataFrame:
+    estimates = main_reconstruction_estimates(
+        samples=samples,
+        seed=seed,
+        method="nnls",
+        noise_fraction=noise_fraction,
+    )
+    sensor21 = [get_sensor(21)]
+    temperatures_k = _temperatures_k(MAIN_TEMPERATURES_C)
+    fends = np.array(
+        [
+            crystallinity_from_durations(sensor21, temperatures_k, estimate)[0]
+            for estimate in estimates
+        ]
+    )
+    return pd.DataFrame(
+        [
+            {
+                "method": "scipy_nnls",
+                "sensor21_fend_mean": float(np.mean(fends)),
+                "sensor21_fend_std": float(np.std(fends, ddof=1)),
+            }
+        ]
+    )
+
+
 def numerical_diagnostics(alpha: float = 1e-11) -> dict[str, object]:
     sensors = [get_sensor(number) for number in range(21, 26)]
     temperatures_k = _temperatures_k(MAIN_TEMPERATURES_C)
@@ -280,6 +320,95 @@ def noise_model_comparison(
                 "fig4_t5_std_s": float(np.std(estimates[:, 4], ddof=1)),
             }
         )
+
+    return pd.DataFrame(rows)
+
+
+def noise_amplitude_sweep(
+    samples: int = 400,
+    seed: int = 2019,
+    noise_fractions: np.ndarray | None = None,
+    alpha: float = 1e-11,
+) -> pd.DataFrame:
+    if noise_fractions is None:
+        noise_fractions = np.array([0.0025, 0.005, 0.01, 0.02, 0.05], dtype=float)
+
+    rows: list[dict[str, float | str]] = []
+    placements = ["fractional_crystallinity", "linearized_observation"]
+
+    main_sensors = [get_sensor(number) for number in range(21, 26)]
+    main_temperatures_k = _temperatures_k(MAIN_TEMPERATURES_C)
+    main_fractions = crystallinity_from_durations(
+        main_sensors,
+        main_temperatures_k,
+        MAIN_DURATIONS_S,
+    )
+    solve_fig3 = lambda noisy: solve_tikhonov(
+        main_sensors,
+        main_temperatures_k,
+        noisy,
+        alpha=alpha,
+    )
+
+    spike_sensors = [get_sensor(number) for number in range(1, 4)]
+    spike_recon_temperatures_k = _temperatures_k(SPIKE_RECON_TEMPERATURES_C)
+    spike_truth_temperatures_c, spike_truth_durations_s = _spike_truth(1100.0)
+    spike_fractions = crystallinity_from_durations(
+        spike_sensors,
+        _temperatures_k(spike_truth_temperatures_c),
+        spike_truth_durations_s,
+    )
+    solve_spike = lambda noisy: solve_tikhonov_total_time(
+        spike_sensors,
+        spike_recon_temperatures_k,
+        noisy,
+        alpha=alpha,
+        total_time_s=float(np.sum(spike_truth_durations_s)),
+    )
+
+    for placement in placements:
+        for noise_fraction in noise_fractions:
+            fig3 = _monte_carlo_estimates(
+                main_fractions,
+                samples,
+                seed,
+                solve_fig3,
+                float(noise_fraction),
+                noise_placement=placement,
+            )
+            rows.append(
+                {
+                    "experiment": "fig3_regularized_lls",
+                    "noise_placement": placement,
+                    "noise_fraction": float(noise_fraction),
+                    "t4_mean_s": float(np.mean(fig3[:, 3])),
+                    "t4_std_s": float(np.std(fig3[:, 3], ddof=1)),
+                    "t5_mean_s": float(np.mean(fig3[:, 4])),
+                    "t5_std_s": float(np.std(fig3[:, 4], ddof=1)),
+                }
+            )
+
+            spike = _monte_carlo_estimates(
+                spike_fractions,
+                samples,
+                seed,
+                solve_spike,
+                float(noise_fraction),
+                noise_placement=placement,
+            )
+            rows.append(
+                {
+                    "experiment": "spike_1100",
+                    "noise_placement": placement,
+                    "noise_fraction": float(noise_fraction),
+                    "t1_mean_s": float(np.mean(spike[:, 0])),
+                    "t1_std_s": float(np.std(spike[:, 0], ddof=1)),
+                    "t2_mean_s": float(np.mean(spike[:, 1])),
+                    "t2_std_s": float(np.std(spike[:, 1], ddof=1)),
+                    "t3_mean_s": float(np.mean(spike[:, 2])),
+                    "t3_std_s": float(np.std(spike[:, 2], ddof=1)),
+                }
+            )
 
     return pd.DataFrame(rows)
 
