@@ -1,0 +1,4 @@
+figure,temperature_c,mean_s,std_s,target_mean_s,target_std_s,fit_std_s,target_fit_std_s
+fig4,1100,101.99999999999999,4.99999999999997,102.0,5.0,,
+fig4,1000,177.0,57.99999999999963,177.0,58.0,,
+fig4,900,374.0,260.00000000000017,374.0,260.0,,
