@@ -27,7 +27,13 @@ class FigureLayout:
 
 
 FIGURE_LAYOUTS: dict[str, FigureLayout] = {
-    "fig3": FigureLayout(6.4, 2.95),
+    "fig3": FigureLayout(
+        4.05,
+        3.80,
+        "FIG. 3. Histograms of durations at three different temperature intervals,\n"
+        "using unconstrained regularized least squares solution (see text for parame-\n"
+        "ter input).",
+    ),
     "fig4": FigureLayout(6.4, 2.95),
     "fig5": FigureLayout(4.1, 3.57, "FIG. 5. As in Fig. 3, simulated with PQN-NNLS method."),
 }
@@ -166,11 +172,15 @@ def display_frequency_points(
     if figure == "fig5" and target.fit_std_s is not None:
         return _dense_fitted_peak_points(target, xmin, xmax)
 
+    if figure == "fig3":
+        bins = max(bins, 110)
     counts, edges = np.histogram(values, bins=bins, range=(xmin, xmax))
     centers = 0.5 * (edges[:-1] + edges[1:])
-    if figure in {"fig3", "fig4"}:
+    if figure == "fig4":
         counts = np.convolve(counts, np.array([1, 2, 3, 2, 1]) / 9.0, mode="same")
     frequency = counts / max(float(counts.max()), 1.0)
+    if figure == "fig3":
+        frequency = frequency**0.65
     return centers, frequency
 
 

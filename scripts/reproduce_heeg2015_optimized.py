@@ -91,7 +91,7 @@ def save_histogram_figure(figure: str, estimates: np.ndarray, output_path: Path)
         xmin, xmax = limits
         values = estimates[:, target.interval_index]
         centers, frequency = display_frequency_points(figure, target, values, xmin, xmax)
-        marker_size = 2.2 if figure == "fig5" else 2.6
+        marker_size = 1.7 if figure == "fig3" else 2.2 if figure == "fig5" else 2.6
         axis.plot(
             centers,
             frequency,
@@ -100,7 +100,7 @@ def save_histogram_figure(figure: str, estimates: np.ndarray, output_path: Path)
             markersize=marker_size,
             markerfacecolor="white",
             markeredgecolor="blue",
-            markeredgewidth=0.65 if figure == "fig5" else 0.8,
+            markeredgewidth=0.65 if figure in {"fig3", "fig5"} else 0.8,
         )
         if figure == "fig5" and target.fit_std_s is not None:
             xfit, yfit = gaussian_curve(target.mean_s, target.fit_std_s, xmin, xmax)
@@ -110,11 +110,11 @@ def save_histogram_figure(figure: str, estimates: np.ndarray, output_path: Path)
         axis.set_title(rf"${interval_label[0]}_{interval_label[1]}: {target.temperature_c}^\circ$C")
         axis.set_xlabel("Duration (s)")
         axis.set_yticklabels([])
-        text_x = 0.39 if figure != "fig5" else 0.59
-        text_size = 7.2 if figure == "fig5" else 9
+        text_x = 0.36 if figure == "fig3" else 0.59 if figure == "fig5" else 0.39
+        text_size = 7.2 if figure in {"fig3", "fig5"} else 9
         axis.text(
             text_x,
-            0.32 if figure == "fig5" else 0.24,
+            0.24 if figure == "fig3" else 0.32 if figure == "fig5" else 0.24,
             rf"$\mu$ = {target.mean_s:g} s",
             transform=axis.transAxes,
             fontsize=text_size,
@@ -123,12 +123,16 @@ def save_histogram_figure(figure: str, estimates: np.ndarray, output_path: Path)
             axis.text(text_x, 0.21, rf"$\sigma_s$ = {target.std_s:g} s", transform=axis.transAxes, fontsize=text_size)
             axis.text(text_x, 0.10, rf"$\sigma_f$ = {target.fit_std_s:g} s", transform=axis.transAxes, fontsize=text_size)
         else:
-            axis.text(text_x, 0.12, rf"$\sigma$ = {target.std_s:g} s", transform=axis.transAxes)
+            axis.text(text_x, 0.12, rf"$\sigma$ = {target.std_s:g} s", transform=axis.transAxes, fontsize=text_size)
         apply_paper_axes(axis)
     axes[0].set_ylabel("Frequency (arb. units)")
     if layout.caption is not None:
-        fig.text(0.5, 0.055, layout.caption, ha="center", fontsize=7.5)
-        fig.tight_layout(rect=(0, 0.13, 1, 1), w_pad=0.55)
+        if figure == "fig3":
+            fig.text(0.035, 0.025, layout.caption, ha="left", fontsize=7.3)
+            fig.tight_layout(rect=(0, 0.18, 1, 1), w_pad=0.55)
+        else:
+            fig.text(0.5, 0.055, layout.caption, ha="center", fontsize=7.5)
+            fig.tight_layout(rect=(0, 0.13, 1, 1), w_pad=0.55)
     else:
         fig.tight_layout()
     fig.savefig(output_path, dpi=300)

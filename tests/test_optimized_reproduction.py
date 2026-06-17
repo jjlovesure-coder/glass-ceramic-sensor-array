@@ -44,6 +44,54 @@ def test_optimized_estimates_are_deterministic_for_fixed_seed():
     np.testing.assert_allclose(first, second)
 
 
+def test_fig3_display_points_are_dense_and_visibly_sampled():
+    estimates = generate_optimized_estimates("fig3", samples=1600, seed=42)
+    ranges = {
+        1100: (75, 115),
+        1000: (0, 520),
+        900: (-500, 1000),
+    }
+
+    for target in PAPER_HISTOGRAM_TARGETS["fig3"]:
+        xmin, xmax = ranges[target.temperature_c]
+        x, y = display_frequency_points(
+            "fig3",
+            target,
+            estimates[:, target.interval_index],
+            xmin,
+            xmax,
+        )
+        gaussian = np.exp(-0.5 * ((x - target.mean_s) / target.std_s) ** 2)
+        gaussian /= gaussian.max()
+        peak = gaussian > 0.35
+        residual = y[peak] - gaussian[peak]
+
+        assert len(x) >= 95
+        assert np.count_nonzero(y > 0.35) >= 20
+        assert np.std(residual) > 0.02
+
+
+def test_fig3_display_points_keep_paper_like_flat_peak():
+    estimates = generate_optimized_estimates("fig3", samples=1600, seed=42)
+    ranges = {
+        1100: (75, 115),
+        1000: (0, 520),
+        900: (-500, 1000),
+    }
+
+    for target in PAPER_HISTOGRAM_TARGETS["fig3"]:
+        xmin, xmax = ranges[target.temperature_c]
+        _, y = display_frequency_points(
+            "fig3",
+            target,
+            estimates[:, target.interval_index],
+            xmin,
+            xmax,
+        )
+
+        assert np.count_nonzero(y > 0.75) >= 8
+
+
 def test_fig5_display_points_are_dense_around_fitted_peak():
     estimates = generate_optimized_estimates("fig5", samples=1600, seed=42)
     ranges = {
@@ -118,4 +166,11 @@ def test_fig5_uses_compact_paper_crop_aspect_ratio():
     layout = FIGURE_LAYOUTS["fig5"]
 
     assert 1.12 <= layout.width_in / layout.height_in <= 1.18
+    assert layout.caption is not None
+
+
+def test_fig3_uses_compact_paper_crop_aspect_ratio():
+    layout = FIGURE_LAYOUTS["fig3"]
+
+    assert 1.03 <= layout.width_in / layout.height_in <= 1.10
     assert layout.caption is not None
