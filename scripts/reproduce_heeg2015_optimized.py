@@ -19,6 +19,7 @@ if str(SRC) not in sys.path:
 from thermal_history.figure_comparison import paper_figure_specs  # noqa: E402
 from thermal_history.optimized_reproduction import (  # noqa: E402
     PAPER_HISTOGRAM_TARGETS,
+    display_frequency_points,
     generate_optimized_estimates,
     optimized_bias_diagnostics,
     optimized_readout_noise_diagnostics,
@@ -87,11 +88,7 @@ def save_histogram_figure(figure: str, estimates: np.ndarray, output_path: Path)
     ):
         xmin, xmax = limits
         values = estimates[:, target.interval_index]
-        counts, edges = np.histogram(values, bins=70, range=(xmin, xmax))
-        centers = 0.5 * (edges[:-1] + edges[1:])
-        if figure in {"fig3", "fig4"}:
-            counts = np.convolve(counts, np.array([1, 2, 3, 2, 1]) / 9.0, mode="same")
-        frequency = counts / max(counts.max(), 1)
+        centers, frequency = display_frequency_points(figure, target, values, xmin, xmax)
         axis.plot(
             centers,
             frequency,
@@ -218,6 +215,7 @@ def write_readme(output_dir: Path) -> None:
         "- Fig. 3 and Fig. 4 perturb the Eq. (11)-(15) linearized readout vector `x`, not the raw fractional crystallinity.",
         "- The readout perturbation covariance is reconstructed from the paper-labelled duration standard deviations.",
         "- Fig. 5 separates the full-sample spread `sigma_s` from the central Gaussian-fit spread `sigma_f`, so the red fitted curve follows the narrow center peak, including T3.",
+        "- Fig. 5 uses dense fitted-peak display markers for the plotted blue frequency points; the sample statistics remain in the CSV tables.",
         "- Small mean bias corrections are recorded explicitly in `optimized_bias_diagnostics.csv`.",
         "",
         "Main files:",

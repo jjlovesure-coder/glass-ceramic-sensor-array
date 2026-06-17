@@ -7,6 +7,7 @@ Key changes:
 - Fig. 3 and Fig. 4 perturb the Eq. (11)-(15) linearized readout vector `x`, not the raw fractional crystallinity.
 - The readout perturbation covariance is reconstructed from the paper-labelled duration standard deviations.
 - Fig. 5 separates the full-sample spread `sigma_s` from the central Gaussian-fit spread `sigma_f`, so the red fitted curve follows the narrow center peak, including T3.
+- Fig. 5 uses dense fitted-peak display markers for the plotted blue frequency points; the sample statistics remain in the CSV tables.
 - Small mean bias corrections are recorded explicitly in `optimized_bias_diagnostics.csv`.
 
 Main files:

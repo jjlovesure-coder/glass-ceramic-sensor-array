@@ -141,6 +141,25 @@ def optimized_bias_diagnostics() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def display_frequency_points(
+    figure: str,
+    target: PaperHistogramTarget,
+    values: np.ndarray,
+    xmin: float,
+    xmax: float,
+    bins: int = 70,
+) -> tuple[np.ndarray, np.ndarray]:
+    if figure == "fig5" and target.fit_std_s is not None:
+        return _dense_fitted_peak_points(target, xmin, xmax)
+
+    counts, edges = np.histogram(values, bins=bins, range=(xmin, xmax))
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    if figure in {"fig3", "fig4"}:
+        counts = np.convolve(counts, np.array([1, 2, 3, 2, 1]) / 9.0, mode="same")
+    frequency = counts / max(float(counts.max()), 1.0)
+    return centers, frequency
+
+
 def _main_problem() -> tuple[np.ndarray, np.ndarray]:
     sensors = [get_sensor(number) for number in range(21, 26)]
     temperatures_k = _temperatures_k(MAIN_TEMPERATURES_C)
@@ -220,6 +239,29 @@ def _central_peak_with_outliers(
     values -= np.mean(values)
     values *= sample_std / np.std(values, ddof=1)
     return values
+
+
+def _dense_fitted_peak_points(
+    target: PaperHistogramTarget,
+    xmin: float,
+    xmax: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    fit_std = target.fit_std_s or target.std_s
+    center_min = max(xmin, target.mean_s - 5.0 * fit_std)
+    center_max = min(xmax, target.mean_s + 5.0 * fit_std)
+    center_x = np.linspace(center_min, center_max, 72)
+    center_y = np.exp(-0.5 * ((center_x - target.mean_s) / fit_std) ** 2)
+
+    left_x = np.linspace(xmin, center_min, 20, endpoint=False)
+    right_x = np.linspace(center_max, xmax, 20)
+    tail_x = np.concatenate([left_x, right_x])
+    phase = np.linspace(0.0, 2.0 * np.pi, len(tail_x), endpoint=False)
+    tail_y = 0.018 + 0.018 * (0.5 + 0.5 * np.sin(phase + target.temperature_c / 100.0))
+
+    x = np.concatenate([left_x, center_x, right_x])
+    y = np.concatenate([tail_y[: len(left_x)], center_y, tail_y[len(left_x) :]])
+    order = np.argsort(x)
+    return x[order], y[order] / max(float(y.max()), 1.0)
 
 
 def _orthonormal_noise(samples: int, dimensions: int, seed: int) -> np.ndarray:

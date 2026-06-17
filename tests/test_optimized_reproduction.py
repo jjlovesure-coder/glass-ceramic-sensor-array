@@ -4,6 +4,7 @@ import numpy as np
 
 from thermal_history.optimized_reproduction import (
     PAPER_HISTOGRAM_TARGETS,
+    display_frequency_points,
     generate_optimized_estimates,
     optimized_summary,
 )
@@ -40,3 +41,25 @@ def test_optimized_estimates_are_deterministic_for_fixed_seed():
     second = generate_optimized_estimates("fig4", samples=128, seed=7)
 
     np.testing.assert_allclose(first, second)
+
+
+def test_fig5_display_points_are_dense_around_fitted_peak():
+    estimates = generate_optimized_estimates("fig5", samples=1600, seed=42)
+    ranges = {
+        1100: (88, 116),
+        1000: (100, 350),
+        900: (350, 450),
+    }
+
+    for target in PAPER_HISTOGRAM_TARGETS["fig5"]:
+        xmin, xmax = ranges[target.temperature_c]
+        x, y = display_frequency_points(
+            "fig5",
+            target,
+            estimates[:, target.interval_index],
+            xmin,
+            xmax,
+        )
+
+        assert len(x) >= 90
+        assert np.count_nonzero(y > 0.1) >= 20
