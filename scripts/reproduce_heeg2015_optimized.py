@@ -91,7 +91,7 @@ def save_histogram_figure(figure: str, estimates: np.ndarray, output_path: Path)
         xmin, xmax = limits
         values = estimates[:, target.interval_index]
         centers, frequency = display_frequency_points(figure, target, values, xmin, xmax)
-        marker_size = 1.7 if figure == "fig3" else 2.2 if figure == "fig5" else 2.6
+        marker_size = 1.7 if figure in {"fig3", "fig4"} else 2.2 if figure == "fig5" else 2.6
         axis.plot(
             centers,
             frequency,
@@ -100,7 +100,7 @@ def save_histogram_figure(figure: str, estimates: np.ndarray, output_path: Path)
             markersize=marker_size,
             markerfacecolor="white",
             markeredgecolor="blue",
-            markeredgewidth=0.65 if figure in {"fig3", "fig5"} else 0.8,
+            markeredgewidth=0.65 if figure in {"fig3", "fig4", "fig5"} else 0.8,
         )
         if figure == "fig5" and target.fit_std_s is not None:
             xfit, yfit = gaussian_curve(target.mean_s, target.fit_std_s, xmin, xmax)
@@ -110,8 +110,8 @@ def save_histogram_figure(figure: str, estimates: np.ndarray, output_path: Path)
         axis.set_title(rf"${interval_label[0]}_{interval_label[1]}: {target.temperature_c}^\circ$C")
         axis.set_xlabel("Duration (s)")
         axis.set_yticklabels([])
-        text_x = 0.36 if figure == "fig3" else 0.59 if figure == "fig5" else 0.39
-        text_size = 7.2 if figure in {"fig3", "fig5"} else 9
+        text_x = 0.36 if figure in {"fig3", "fig4"} else 0.59 if figure == "fig5" else 0.39
+        text_size = 7.2 if figure in {"fig3", "fig4", "fig5"} else 9
         axis.text(
             text_x,
             0.24 if figure == "fig3" else 0.32 if figure == "fig5" else 0.24,

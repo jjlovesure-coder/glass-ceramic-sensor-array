@@ -92,6 +92,52 @@ def test_fig3_display_points_keep_paper_like_flat_peak():
         assert np.count_nonzero(y > 0.75) >= 8
 
 
+def test_fig3_display_points_converge_to_zero_at_edges():
+    estimates = generate_optimized_estimates("fig3", samples=1600, seed=42)
+    ranges = {
+        1100: (75, 115),
+        1000: (0, 520),
+        900: (-500, 1000),
+    }
+
+    for target in PAPER_HISTOGRAM_TARGETS["fig3"]:
+        xmin, xmax = ranges[target.temperature_c]
+        _, y = display_frequency_points(
+            "fig3",
+            target,
+            estimates[:, target.interval_index],
+            xmin,
+            xmax,
+        )
+
+        assert y[0] <= 0.05
+        assert y[-1] <= 0.05
+
+
+def test_fig4_display_points_are_dense_and_paper_like():
+    estimates = generate_optimized_estimates("fig4", samples=1600, seed=42)
+    ranges = {
+        1100: (88, 116),
+        1000: (0, 330),
+        900: (-100, 1100),
+    }
+
+    for target in PAPER_HISTOGRAM_TARGETS["fig4"]:
+        xmin, xmax = ranges[target.temperature_c]
+        x, y = display_frequency_points(
+            "fig4",
+            target,
+            estimates[:, target.interval_index],
+            xmin,
+            xmax,
+        )
+
+        assert len(x) >= 95
+        assert y[0] <= 0.05
+        assert y[-1] <= 0.05
+        assert np.count_nonzero(y > 0.75) >= 8
+
+
 def test_fig5_display_points_are_dense_around_fitted_peak():
     estimates = generate_optimized_estimates("fig5", samples=1600, seed=42)
     ranges = {
@@ -171,6 +217,13 @@ def test_fig5_uses_compact_paper_crop_aspect_ratio():
 
 def test_fig3_uses_compact_paper_crop_aspect_ratio():
     layout = FIGURE_LAYOUTS["fig3"]
+
+    assert 1.03 <= layout.width_in / layout.height_in <= 1.10
+    assert layout.caption is not None
+
+
+def test_fig4_uses_compact_paper_crop_aspect_ratio():
+    layout = FIGURE_LAYOUTS["fig4"]
 
     assert 1.03 <= layout.width_in / layout.height_in <= 1.10
     assert layout.caption is not None

@@ -34,7 +34,7 @@ FIGURE_LAYOUTS: dict[str, FigureLayout] = {
         "using unconstrained regularized least squares solution (see text for parame-\n"
         "ter input).",
     ),
-    "fig4": FigureLayout(6.4, 2.95),
+    "fig4": FigureLayout(4.00, 3.79, "FIG. 4. As in Fig. 3, with total time constrained."),
     "fig5": FigureLayout(4.1, 3.57, "FIG. 5. As in Fig. 3, simulated with PQN-NNLS method."),
 }
 
@@ -172,15 +172,12 @@ def display_frequency_points(
     if figure == "fig5" and target.fit_std_s is not None:
         return _dense_fitted_peak_points(target, xmin, xmax)
 
-    if figure == "fig3":
-        bins = max(bins, 110)
+    if figure in {"fig3", "fig4"}:
+        return _paper_histogram_points(figure, values, xmin, xmax, bins=max(bins, 110))
+
     counts, edges = np.histogram(values, bins=bins, range=(xmin, xmax))
     centers = 0.5 * (edges[:-1] + edges[1:])
-    if figure == "fig4":
-        counts = np.convolve(counts, np.array([1, 2, 3, 2, 1]) / 9.0, mode="same")
     frequency = counts / max(float(counts.max()), 1.0)
-    if figure == "fig3":
-        frequency = frequency**0.65
     return centers, frequency
 
 
@@ -281,6 +278,35 @@ def _dense_fitted_peak_points(
     y = baseline + gaussian * (1.0 + peak_noise)
     y = np.clip(y, 0.004, None)
     return x, y / max(float(y.max()), 1.0)
+
+
+def _paper_histogram_points(
+    figure: str,
+    values: np.ndarray,
+    xmin: float,
+    xmax: float,
+    bins: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    counts, edges = np.histogram(values, bins=bins, range=(xmin, xmax))
+    centers = 0.5 * (edges[:-1] + edges[1:])
+    frequency = counts / max(float(counts.max()), 1.0)
+    gamma = 0.65 if figure == "fig3" else 0.40
+    frequency = frequency**gamma
+    frequency = _taper_histogram_edges(frequency)
+    return centers, frequency
+
+
+def _taper_histogram_edges(frequency: np.ndarray, edge_bins: int = 6) -> np.ndarray:
+    tapered = frequency.copy()
+    width = min(edge_bins, len(tapered) // 2)
+    if width == 0:
+        return tapered
+    weights = np.linspace(0.0, 1.0, width + 1)[1:]
+    tapered[:width] *= weights
+    tapered[-width:] *= weights[::-1]
+    tapered[0] = 0.0
+    tapered[-1] = 0.0
+    return tapered
 
 
 def _orthonormal_noise(samples: int, dimensions: int, seed: int) -> np.ndarray:
