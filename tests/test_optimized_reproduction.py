@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 
 from thermal_history.optimized_reproduction import (
+    FIGURE_LAYOUTS,
     PAPER_HISTOGRAM_TARGETS,
     display_frequency_points,
     generate_optimized_estimates,
@@ -61,5 +62,60 @@ def test_fig5_display_points_are_dense_around_fitted_peak():
             xmax,
         )
 
-        assert len(x) >= 90
+        assert len(x) >= 200
         assert np.count_nonzero(y > 0.1) >= 20
+
+
+def test_fig5_display_points_are_not_a_perfect_gaussian_trace():
+    estimates = generate_optimized_estimates("fig5", samples=1600, seed=42)
+    ranges = {
+        1100: (88, 116),
+        1000: (100, 350),
+        900: (350, 450),
+    }
+
+    for target in PAPER_HISTOGRAM_TARGETS["fig5"]:
+        xmin, xmax = ranges[target.temperature_c]
+        x, y = display_frequency_points(
+            "fig5",
+            target,
+            estimates[:, target.interval_index],
+            xmin,
+            xmax,
+        )
+        gaussian = np.exp(-0.5 * ((x - target.mean_s) / target.fit_std_s) ** 2)
+        gaussian /= gaussian.max()
+        peak = gaussian > 0.1
+        residual = y[peak] - gaussian[peak]
+
+        assert np.std(residual) > 0.015
+        assert np.max(y[~peak]) > 0.02
+
+
+def test_fig5_display_points_have_no_side_gaps():
+    estimates = generate_optimized_estimates("fig5", samples=1600, seed=42)
+    ranges = {
+        1100: (88, 116),
+        1000: (100, 350),
+        900: (350, 450),
+    }
+
+    for target in PAPER_HISTOGRAM_TARGETS["fig5"]:
+        xmin, xmax = ranges[target.temperature_c]
+        x, _ = display_frequency_points(
+            "fig5",
+            target,
+            estimates[:, target.interval_index],
+            xmin,
+            xmax,
+        )
+        max_allowed_gap = (xmax - xmin) / 180.0
+
+        assert np.max(np.diff(np.sort(x))) <= max_allowed_gap
+
+
+def test_fig5_uses_compact_paper_crop_aspect_ratio():
+    layout = FIGURE_LAYOUTS["fig5"]
+
+    assert 1.12 <= layout.width_in / layout.height_in <= 1.18
+    assert layout.caption is not None

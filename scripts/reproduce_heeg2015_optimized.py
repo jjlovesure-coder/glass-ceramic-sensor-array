@@ -18,6 +18,7 @@ if str(SRC) not in sys.path:
 
 from thermal_history.figure_comparison import paper_figure_specs  # noqa: E402
 from thermal_history.optimized_reproduction import (  # noqa: E402
+    FIGURE_LAYOUTS,
     PAPER_HISTOGRAM_TARGETS,
     display_frequency_points,
     generate_optimized_estimates,
@@ -78,7 +79,8 @@ def gaussian_curve(mean: float, std: float, xmin: float, xmax: float) -> tuple[n
 
 def save_histogram_figure(figure: str, estimates: np.ndarray, output_path: Path) -> None:
     targets = PAPER_HISTOGRAM_TARGETS[figure]
-    fig, axes = plt.subplots(1, 3, figsize=(6.4, 2.95), sharey=True)
+    layout = FIGURE_LAYOUTS[figure]
+    fig, axes = plt.subplots(1, 3, figsize=(layout.width_in, layout.height_in), sharey=True)
     for axis, target, interval_label, limits in zip(
         axes,
         targets,
@@ -89,34 +91,46 @@ def save_histogram_figure(figure: str, estimates: np.ndarray, output_path: Path)
         xmin, xmax = limits
         values = estimates[:, target.interval_index]
         centers, frequency = display_frequency_points(figure, target, values, xmin, xmax)
+        marker_size = 2.2 if figure == "fig5" else 2.6
         axis.plot(
             centers,
             frequency,
             linestyle="None",
             marker="o",
-            markersize=2.6,
+            markersize=marker_size,
             markerfacecolor="white",
             markeredgecolor="blue",
-            markeredgewidth=0.8,
+            markeredgewidth=0.65 if figure == "fig5" else 0.8,
         )
         if figure == "fig5" and target.fit_std_s is not None:
             xfit, yfit = gaussian_curve(target.mean_s, target.fit_std_s, xmin, xmax)
-            axis.plot(xfit, yfit, color="red", linewidth=1.4)
+            axis.plot(xfit, yfit, color="red", linewidth=1.0)
         axis.set_xlim(xmin, xmax)
         axis.set_ylim(-0.02, 1.08)
         axis.set_title(rf"${interval_label[0]}_{interval_label[1]}: {target.temperature_c}^\circ$C")
         axis.set_xlabel("Duration (s)")
         axis.set_yticklabels([])
-        text_x = 0.39 if figure != "fig5" else 0.66
-        axis.text(text_x, 0.32 if figure == "fig5" else 0.24, rf"$\mu$ = {target.mean_s:g} s", transform=axis.transAxes)
+        text_x = 0.39 if figure != "fig5" else 0.59
+        text_size = 7.2 if figure == "fig5" else 9
+        axis.text(
+            text_x,
+            0.32 if figure == "fig5" else 0.24,
+            rf"$\mu$ = {target.mean_s:g} s",
+            transform=axis.transAxes,
+            fontsize=text_size,
+        )
         if figure == "fig5" and target.fit_std_s is not None:
-            axis.text(text_x, 0.21, rf"$\sigma_s$ = {target.std_s:g} s", transform=axis.transAxes, fontsize=8)
-            axis.text(text_x, 0.10, rf"$\sigma_f$ = {target.fit_std_s:g} s", transform=axis.transAxes, fontsize=8)
+            axis.text(text_x, 0.21, rf"$\sigma_s$ = {target.std_s:g} s", transform=axis.transAxes, fontsize=text_size)
+            axis.text(text_x, 0.10, rf"$\sigma_f$ = {target.fit_std_s:g} s", transform=axis.transAxes, fontsize=text_size)
         else:
             axis.text(text_x, 0.12, rf"$\sigma$ = {target.std_s:g} s", transform=axis.transAxes)
         apply_paper_axes(axis)
     axes[0].set_ylabel("Frequency (arb. units)")
-    fig.tight_layout()
+    if layout.caption is not None:
+        fig.text(0.5, 0.055, layout.caption, ha="center", fontsize=7.5)
+        fig.tight_layout(rect=(0, 0.13, 1, 1), w_pad=0.55)
+    else:
+        fig.tight_layout()
     fig.savefig(output_path, dpi=300)
     plt.close(fig)
 

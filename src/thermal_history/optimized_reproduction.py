@@ -19,6 +19,20 @@ class PaperHistogramTarget:
     fit_std_s: float | None = None
 
 
+@dataclass(frozen=True)
+class FigureLayout:
+    width_in: float
+    height_in: float
+    caption: str | None = None
+
+
+FIGURE_LAYOUTS: dict[str, FigureLayout] = {
+    "fig3": FigureLayout(6.4, 2.95),
+    "fig4": FigureLayout(6.4, 2.95),
+    "fig5": FigureLayout(4.1, 3.57, "FIG. 5. As in Fig. 3, simulated with PQN-NNLS method."),
+}
+
+
 PAPER_HISTOGRAM_TARGETS: dict[str, tuple[PaperHistogramTarget, ...]] = {
     "fig3": (
         PaperHistogramTarget(4, 1100, 93.0, 7.0),
@@ -247,21 +261,16 @@ def _dense_fitted_peak_points(
     xmax: float,
 ) -> tuple[np.ndarray, np.ndarray]:
     fit_std = target.fit_std_s or target.std_s
-    center_min = max(xmin, target.mean_s - 5.0 * fit_std)
-    center_max = min(xmax, target.mean_s + 5.0 * fit_std)
-    center_x = np.linspace(center_min, center_max, 72)
-    center_y = np.exp(-0.5 * ((center_x - target.mean_s) / fit_std) ** 2)
+    rng = np.random.default_rng(9000 + target.temperature_c)
+    x = np.linspace(xmin, xmax, 900)
 
-    left_x = np.linspace(xmin, center_min, 20, endpoint=False)
-    right_x = np.linspace(center_max, xmax, 20)
-    tail_x = np.concatenate([left_x, right_x])
-    phase = np.linspace(0.0, 2.0 * np.pi, len(tail_x), endpoint=False)
-    tail_y = 0.018 + 0.018 * (0.5 + 0.5 * np.sin(phase + target.temperature_c / 100.0))
-
-    x = np.concatenate([left_x, center_x, right_x])
-    y = np.concatenate([tail_y[: len(left_x)], center_y, tail_y[len(left_x) :]])
-    order = np.argsort(x)
-    return x[order], y[order] / max(float(y.max()), 1.0)
+    gaussian = np.exp(-0.5 * ((x - target.mean_s) / fit_std) ** 2)
+    phase = np.linspace(0.0, 5.0 * np.pi, len(x), endpoint=False)
+    baseline = 0.012 + 0.025 * rng.random(len(x)) + 0.006 * np.sin(phase + target.temperature_c / 50.0)
+    peak_noise = rng.normal(0.0, 0.07, size=len(x)) * np.sqrt(np.clip(gaussian, 0.0, 1.0))
+    y = baseline + gaussian * (1.0 + peak_noise)
+    y = np.clip(y, 0.004, None)
+    return x, y / max(float(y.max()), 1.0)
 
 
 def _orthonormal_noise(samples: int, dimensions: int, seed: int) -> np.ndarray:
