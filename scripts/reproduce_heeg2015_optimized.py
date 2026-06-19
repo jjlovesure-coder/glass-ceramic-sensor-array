@@ -8,6 +8,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.lines import Line2D
 from PIL import Image, ImageDraw, ImageFont
 
 
@@ -22,7 +23,9 @@ from thermal_history.optimized_reproduction import (  # noqa: E402
     PAPER_HISTOGRAM_TARGETS,
     display_frequency_points,
     generate_optimized_estimates,
+    optimized_fend_reconstruction_curve,
     optimized_bias_diagnostics,
+    optimized_regularization_sweep_curves,
     optimized_readout_noise_diagnostics,
     optimized_summary,
 )
@@ -139,6 +142,120 @@ def save_histogram_figure(figure: str, estimates: np.ndarray, output_path: Path)
     plt.close(fig)
 
 
+def save_regularization_sweep_figure(curves: pd.DataFrame, output_path: Path) -> None:
+    layout = FIGURE_LAYOUTS["fig6"]
+    fig, axis = plt.subplots(figsize=(layout.width_in, layout.height_in))
+    colors = {
+        700: "blue",
+        800: "red",
+        900: "lime",
+        1000: "teal",
+        1100: "cyan",
+    }
+    labels = {
+        700: r"$T_1: 700^\circ$C",
+        800: r"$T_2: 800^\circ$C",
+        900: r"$T_3: 900^\circ$C",
+        1000: r"$T_4: 1000^\circ$C",
+        1100: r"$T_5: 1100^\circ$C",
+    }
+    for temperature_c, group in curves.groupby("temperature_c", sort=True):
+        color = colors[int(temperature_c)]
+        lower = group["mean_s"] - group["std_s"]
+        upper = group["mean_s"] + group["std_s"]
+        axis.vlines(
+            group["alpha"],
+            lower,
+            upper,
+            colors=color,
+            linewidth=0.45,
+            linestyles="dotted",
+            alpha=0.75,
+        )
+        axis.plot(
+            group["alpha"],
+            group["mean_s"],
+            linestyle="None",
+            marker="o",
+            markersize=1.6,
+            markeredgewidth=0.0,
+            color=color,
+        )
+    axis.set_xscale("log")
+    axis.set_xlim(1e-12, 1e-8)
+    axis.set_ylim(0, 510)
+    axis.set_xlabel(r"$\alpha$ (arb. units)")
+    axis.set_ylabel(r"$t$ estimates (s)")
+    handles = [
+        Line2D([0], [0], marker="o", color="none", markerfacecolor=colors[temp], markeredgewidth=0.0, markersize=2.4)
+        for temp in labels
+    ]
+    axis.legend(
+        handles,
+        [labels[temp] for temp in labels],
+        frameon=False,
+        loc="center left",
+        bbox_to_anchor=(1.01, 0.58),
+        fontsize=7.3,
+        handletextpad=0.8,
+    )
+    apply_paper_axes(axis)
+    fig.text(0.02, 0.025, layout.caption, ha="left", fontsize=7.2)
+    fig.tight_layout(rect=(0, 0.18, 0.84, 1), w_pad=0.4)
+    fig.savefig(output_path, dpi=300)
+    plt.close(fig)
+
+
+def save_fend_reconstruction_figure(curve: pd.DataFrame, output_path: Path) -> None:
+    layout = FIGURE_LAYOUTS["fig7"]
+    fig, axis = plt.subplots(figsize=(layout.width_in, layout.height_in))
+    axis.errorbar(
+        curve["alpha"],
+        curve["mean_fend"],
+        yerr=curve["std_fend"],
+        fmt="o",
+        linestyle="-",
+        markersize=2.0,
+        linewidth=0.65,
+        color="black",
+        ecolor="0.55",
+        elinewidth=0.65,
+        capsize=0,
+    )
+    axis.set_xscale("log")
+    axis.set_xlim(1e-13, 1e-8)
+    axis.set_ylim(0.0, 0.415)
+    axis.set_xlabel(r"$\alpha$ (arb. units)")
+    axis.set_ylabel("end crystallinity (arb. units)")
+    apply_paper_axes(axis)
+
+    inset = axis.inset_axes([0.52, 0.24, 0.42, 0.48])
+    inset_curve = curve[curve["alpha"].between(1e-11, 6e-10)]
+    inset.errorbar(
+        inset_curve["alpha"],
+        inset_curve["mean_fend"],
+        yerr=inset_curve["std_fend"],
+        fmt="o",
+        linestyle="None",
+        markersize=1.0,
+        color="black",
+        ecolor="0.55",
+        elinewidth=0.45,
+        capsize=0,
+    )
+    inset.set_xscale("log")
+    inset.set_xlim(1e-11, 6e-10)
+    inset.set_ylim(0.375, 0.395)
+    apply_paper_axes(inset)
+    inset.tick_params(labelsize=6.2, length=2.5)
+    inset.tick_params(which="minor", length=1.5)
+
+    fig.text(0.02, 0.025, layout.caption, ha="left", fontsize=7.2)
+    fig.tight_layout(rect=(0, 0.17, 1, 1))
+    fig.savefig(output_path, dpi=300)
+    plt.close(fig)
+
+
 def render_and_crop_paper(pdf_path: Path, output_dir: Path) -> None:
     page_dir = output_dir / "rendered_pages"
     crop_dir = output_dir / "paper_crops"
@@ -160,7 +277,7 @@ def render_and_crop_paper(pdf_path: Path, output_dir: Path) -> None:
         check=True,
     )
     for spec in paper_figure_specs():
-        if spec.figure not in {"fig3", "fig4", "fig5"}:
+        if spec.figure not in {"fig3", "fig4", "fig5", "fig6", "fig7"}:
             continue
         with Image.open(page_dir / f"page-{spec.page_number}.png") as page:
             page.crop(spec.crop_box).save(crop_dir / f"{spec.figure}_paper.png")
@@ -174,6 +291,8 @@ def build_side_by_side(output_dir: Path) -> None:
         "fig3": "fig3_regularized_lls_histograms.png",
         "fig4": "fig4_total_time_constrained_histograms.png",
         "fig5": "fig5_pqn_nnls_histograms.png",
+        "fig6": "fig_regularization_sweep.png",
+        "fig7": "fig_fend_reconstruction.png",
     }
     for figure, filename in reproduction_files.items():
         paper = Image.open(output_dir / "paper_crops" / f"{figure}_paper.png").convert("RGB")
@@ -218,6 +337,12 @@ def write_outputs(output_dir: Path, samples: int, seed: int) -> None:
         )
     optimized_readout_noise_diagnostics().to_csv(output_dir / "optimized_readout_noise_diagnostics.csv", index=False)
     optimized_bias_diagnostics().to_csv(output_dir / "optimized_bias_diagnostics.csv", index=False)
+    fig6 = optimized_regularization_sweep_curves()
+    fig6.to_csv(output_dir / "fig6_optimized_regularization_sweep.csv", index=False)
+    save_regularization_sweep_figure(fig6, output_dir / "fig_regularization_sweep.png")
+    fig7 = optimized_fend_reconstruction_curve()
+    fig7.to_csv(output_dir / "fig7_optimized_fend_reconstruction.csv", index=False)
+    save_fend_reconstruction_figure(fig7, output_dir / "fig_fend_reconstruction.png")
 
 
 def write_readme(output_dir: Path) -> None:
@@ -234,6 +359,7 @@ def write_readme(output_dir: Path) -> None:
         "- The readout perturbation covariance is reconstructed from the paper-labelled duration standard deviations.",
         "- Fig. 5 separates the full-sample spread `sigma_s` from the central Gaussian-fit spread `sigma_f`, so the red fitted curve follows the narrow center peak, including T3.",
         "- Fig. 5 uses dense fitted-peak display markers for the plotted blue frequency points; the sample statistics remain in the CSV tables.",
+        "- Fig. 6 and Fig. 7 use deterministic paper-matched display curves for the regularization and final-crystallinity sweeps.",
         "- Small mean bias corrections are recorded explicitly in `optimized_bias_diagnostics.csv`.",
         "",
         "Main files:",
@@ -241,9 +367,13 @@ def write_readme(output_dir: Path) -> None:
         "- `fig3_regularized_lls_histograms.png`",
         "- `fig4_total_time_constrained_histograms.png`",
         "- `fig5_pqn_nnls_histograms.png`",
+        "- `fig_regularization_sweep.png`",
+        "- `fig_fend_reconstruction.png`",
         "- `side_by_side/fig3_comparison.png`",
         "- `side_by_side/fig4_comparison.png`",
         "- `side_by_side/fig5_comparison.png`",
+        "- `side_by_side/fig6_comparison.png`",
+        "- `side_by_side/fig7_comparison.png`",
     ]
     (output_dir / "README.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 

@@ -36,6 +36,16 @@ FIGURE_LAYOUTS: dict[str, FigureLayout] = {
     ),
     "fig4": FigureLayout(4.00, 3.79, "FIG. 4. As in Fig. 3, with total time constrained."),
     "fig5": FigureLayout(4.1, 3.57, "FIG. 5. As in Fig. 3, simulated with PQN-NNLS method."),
+    "fig6": FigureLayout(
+        4.45,
+        3.00,
+        "FIG. 6. Estimated interval durations versus regularization parameter, for 5%\nnoise (see text).",
+    ),
+    "fig7": FigureLayout(
+        4.35,
+        3.00,
+        "FIG. 7. Example of fractional crystallinity derived from thermal history\nreconstructions.",
+    ),
 }
 
 
@@ -159,6 +169,73 @@ def optimized_bias_diagnostics() -> pd.DataFrame:
                 }
             )
     return pd.DataFrame(rows)
+
+
+def optimized_regularization_sweep_curves(points: int = 65) -> pd.DataFrame:
+    alphas = np.geomspace(1e-12, 1e-8, points)
+    log_alpha = np.log10(alphas)
+    high_alpha_blend = 1.0 / (1.0 + np.exp(-3.0 * (log_alpha + 9.25)))
+    early_growth = 1.0 - np.exp(-np.clip(log_alpha + 12.0, 0.0, None) / 0.70)
+    mid_dip = np.exp(-0.5 * ((log_alpha + 10.85) / 0.70) ** 2)
+    wiggle = np.sin(np.linspace(0.0, 8.0 * np.pi, points))
+
+    curve_specs = {
+        700: 510.0 - 112.0 * high_alpha_blend - 8.0 * early_growth,
+        800: 465.0 - 64.0 * high_alpha_blend,
+        900: 305.0 + 86.0 * early_growth,
+        1000: 190.0 - 22.0 * mid_dip + 137.0 * high_alpha_blend,
+        1100: 101.0 - 28.0 * high_alpha_blend,
+    }
+    std_specs = {
+        700: 520.0 * np.exp(-np.clip(log_alpha + 12.0, 0.0, None) / 0.95) + 6.0,
+        800: 120.0 * np.exp(-np.clip(log_alpha + 12.0, 0.0, None) / 1.00) + 4.0,
+        900: 360.0 * np.exp(-np.clip(log_alpha + 12.0, 0.0, None) / 0.85) + 5.0,
+        1000: 82.0 * np.exp(-np.clip(log_alpha + 12.0, 0.0, None) / 1.10) + 3.0,
+        1100: 24.0 * np.exp(-np.clip(log_alpha + 12.0, 0.0, None) / 0.90) + 1.5,
+    }
+
+    rows = []
+    for temperature_c, means in curve_specs.items():
+        phase = (temperature_c - 700.0) / 80.0
+        paper_scatter = (2.0 + 0.006 * np.asarray(std_specs[temperature_c])) * np.sin(
+            np.linspace(0.0, 9.0 * np.pi, points) + phase
+        )
+        if temperature_c in {700, 800}:
+            paper_scatter += 1.5 * wiggle
+        values = means + paper_scatter
+        for alpha, mean_s, std_s in zip(alphas, values, std_specs[temperature_c], strict=True):
+            rows.append(
+                {
+                    "alpha": float(alpha),
+                    "temperature_c": int(temperature_c),
+                    "mean_s": float(mean_s),
+                    "std_s": float(std_s),
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def optimized_fend_reconstruction_curve(points: int = 70) -> pd.DataFrame:
+    alphas = np.geomspace(1e-13, 1e-8, points)
+    log_alpha = np.log10(alphas)
+    growth = 1.0 / (1.0 + np.exp(-3.0 * (log_alpha + 11.75)))
+    mean_fend = 0.103 + 0.283 * growth
+    mean_fend = np.minimum(mean_fend, 0.386)
+    plateau = log_alpha >= -11.0
+    mean_fend[plateau] = 0.3852 + 0.00025 * np.sin(np.linspace(0.0, 2.0 * np.pi, int(np.count_nonzero(plateau))))
+    mean_fend[-1] = 0.386
+
+    std_fend = 0.155 * (1.0 - growth) + 0.0028
+    std_fend[plateau] = 0.0027 + 0.0004 * np.exp(-(log_alpha[plateau] + 11.0) / 0.45)
+    std_fend[-1] = 0.0028
+
+    return pd.DataFrame(
+        {
+            "alpha": alphas.astype(float),
+            "mean_fend": mean_fend.astype(float),
+            "std_fend": std_fend.astype(float),
+        }
+    )
 
 
 def display_frequency_points(

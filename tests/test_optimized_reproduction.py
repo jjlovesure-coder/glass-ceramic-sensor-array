@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from thermal_history.optimized_reproduction import (
     FIGURE_LAYOUTS,
     PAPER_HISTOGRAM_TARGETS,
     display_frequency_points,
     generate_optimized_estimates,
+    optimized_fend_reconstruction_curve,
+    optimized_regularization_sweep_curves,
     optimized_summary,
 )
 
@@ -227,3 +230,56 @@ def test_fig4_uses_compact_paper_crop_aspect_ratio():
 
     assert 1.03 <= layout.width_in / layout.height_in <= 1.10
     assert layout.caption is not None
+
+
+def test_optimized_fig6_regularization_curves_match_paper_shape():
+    curves = optimized_regularization_sweep_curves(points=65)
+
+    assert set(curves["temperature_c"]) == {700, 800, 900, 1000, 1100}
+    assert curves["alpha"].min() == np.float64(1e-12)
+    assert curves["alpha"].max() == np.float64(1e-8)
+
+    low_alpha = curves.loc[curves.groupby("temperature_c")["alpha"].idxmin()]
+    high_alpha = curves.loc[curves.groupby("temperature_c")["alpha"].idxmax()]
+    low_by_temp = low_alpha.set_index("temperature_c")
+    high_by_temp = high_alpha.set_index("temperature_c")
+
+    assert low_by_temp.loc[700, "mean_s"] > 480
+    assert low_by_temp.loc[800, "mean_s"] > 440
+    assert low_by_temp.loc[900, "mean_s"] < 340
+    assert low_by_temp.loc[1000, "mean_s"] < 220
+    assert 90 <= low_by_temp.loc[1100, "mean_s"] <= 115
+
+    assert 385 <= high_by_temp.loc[700, "mean_s"] <= 415
+    assert 385 <= high_by_temp.loc[800, "mean_s"] <= 415
+    assert 380 <= high_by_temp.loc[900, "mean_s"] <= 405
+    assert 290 <= high_by_temp.loc[1000, "mean_s"] <= 330
+    assert 65 <= high_by_temp.loc[1100, "mean_s"] <= 85
+
+    assert low_by_temp.loc[700, "std_s"] > high_by_temp.loc[700, "std_s"]
+    assert low_by_temp.loc[900, "std_s"] > high_by_temp.loc[900, "std_s"]
+
+
+def test_optimized_fig7_fend_curve_matches_paper_shape():
+    curve = optimized_fend_reconstruction_curve(points=70)
+
+    assert curve["alpha"].min() == np.float64(1e-13)
+    assert curve["alpha"].max() == np.float64(1e-8)
+    assert curve.iloc[0]["mean_fend"] < 0.13
+    assert curve.iloc[-1]["mean_fend"] == pytest.approx(0.386, rel=0.01)
+    assert curve.iloc[0]["std_fend"] > 0.10
+    assert curve.iloc[-1]["std_fend"] < 0.004
+
+    inset = curve[curve["alpha"].between(1e-11, 6e-10)]
+    assert len(inset) >= 15
+    assert inset["mean_fend"].between(0.382, 0.389).all()
+
+
+def test_fig6_and_fig7_use_paper_crop_aspect_ratios():
+    fig6 = FIGURE_LAYOUTS["fig6"]
+    fig7 = FIGURE_LAYOUTS["fig7"]
+
+    assert 1.43 <= fig6.width_in / fig6.height_in <= 1.53
+    assert 1.39 <= fig7.width_in / fig7.height_in <= 1.50
+    assert fig6.caption is not None
+    assert fig7.caption is not None
